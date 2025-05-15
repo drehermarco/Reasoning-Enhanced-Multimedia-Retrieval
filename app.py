@@ -11,8 +11,8 @@ class App(CTk):
         self.model = "No model selected"
         self.options = ["No model selected", "rem", "llama3.2-vision"]
         self.client = ollama.Client()
-        self.chat_history = [
-            {"role": "system", "content": "You are a helpful assistant."}
+        self.chat_history = [ #Just initial prompt attempt, move to model file
+            {"role": "system", "content": "You are an expert at analyzing QA questions. Please use reasoning to decompose natural language speech questions into queries, that can be used to retrieve images. Your task is just to decompose the questions into a statement sentence. Do not answer the questions. Do not provide any other information."},
         ]
         self.initUI()
 
@@ -97,9 +97,10 @@ class App(CTk):
 
     
     def stream_model_response(self, query):
-        self.chat_history.append({"role": "user", "content": query})
         try:
             response = ""
+            # Add a prefix for the model's response in the UI
+            self.out_textbox.insert("end", f"\n{self.model}: ")
             for chunk in self.client.chat(model=self.model, messages=self.chat_history, stream=True):
                 part = chunk['message']['content']
                 response += part
@@ -108,8 +109,11 @@ class App(CTk):
                 self.update_idletasks()
             # Append assistant response to history
             self.chat_history.append({"role": "assistant", "content": response})
+            self.out_textbox.insert("end", "\n\n") # Add extra newline for spacing
+            self.out_textbox.see("end")
         except Exception as e:
-            self.out_textbox.insert("end", f"\nError: {e}\n")
+            self.out_textbox.insert("end", f"\nError: {e}\n\n")
+            self.out_textbox.see("end")
         finally:
             self.out_textbox.configure(state="disabled")
 
@@ -117,15 +121,32 @@ class App(CTk):
     def submit_query(self):
         self.out_textbox.configure(state="normal")
         query = self.input_field.get("0.0", "end").strip()
-        self.input_field.delete("0.0", "end")
-        self.out_textbox.delete("0.0", "end")
-
-        if self.model == "No model selected":
-            self.out_textbox.insert("0.0", "Please select a model.")
+        
+        if not query: # Do nothing if query is empty
             self.out_textbox.configure(state="disabled")
             return
 
+        # Display user query in the output box
+        current_content = self.out_textbox.get("0.0", "end-1c").strip() # Get content excluding the final newline
+        if current_content: # Add a newline if there's existing content
+            self.out_textbox.insert("end", f"\nUser: {query}\n")
+        else:
+            self.out_textbox.insert("end", f"User: {query}\n")
+        
+        self.out_textbox.see("end")
+        self.input_field.delete("0.0", "end")
+
+        if self.model == "No model selected":
+            self.out_textbox.insert("end", "Please select a model.\n\n")
+            self.out_textbox.configure(state="disabled")
+            self.out_textbox.see("end")
+            return
+        
+        # Append user message to chat history before starting the thread
+        self.chat_history.append({"role": "user", "content": query})
+
         Thread(target=self.stream_model_response, args=(query,), daemon=True).start()
+
 
     def add_model(self):
         dialog = CTkInputDialog(text="Type in the name of the model.\n (You need to have a local version of your LLM):", title="Add a model")
