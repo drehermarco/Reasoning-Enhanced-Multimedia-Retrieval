@@ -9,11 +9,9 @@ class App(CTk):
     def __init__(self):
         super().__init__()
         self.model = "No model selected"
-        self.options = ["No model selected", "rem", "llama3.2-vision"]
+        self.options = ["No model selected", "llama3.2-vision",  "modded_llama3.2"]
         self.client = ollama.Client()
-        self.chat_history = [
-            {"role": "system", "content": "You are a helpful assistant."}
-        ]
+        self.chat_history = []
         self.initUI()
 
     def initUI(self):
@@ -117,7 +115,7 @@ class App(CTk):
     def submit_query(self):
         self.out_textbox.configure(state="normal")
         query = self.input_field.get("0.0", "end").strip()
-        self.input_field.delete("0.0", "end")
+        #self.input_field.delete("0.0", "end")
         self.out_textbox.delete("0.0", "end")
 
         if self.model == "No model selected":
