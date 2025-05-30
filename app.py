@@ -7,13 +7,13 @@ import subprocess
 import sys
 from clip_searcher import ClipSearcher
 from threading import Thread
-
+from PIL import Image, ImageTk
 
 class App(CTk):
     def __init__(self):
         super().__init__()
-        self.model = "modded_llama3.2"
-        self.options = ["No model selected", "test_llm", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
+        self.model = "llama3.2-vision"
+        self.options = ["No model selected", "llama3.2-vision", "test_llm", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
         self.client = ollama.Client()
         self.chat_history = []
         self.queries = []
@@ -92,9 +92,9 @@ class App(CTk):
         self.divider = CTkFrame(self.option_frame, height=2, fg_color="#D3D3D3")
         self.divider.pack(fill="x", pady=(10, 5))
 
-        # Maybe insert pictures here later
-        self.temp_label = CTkLabel(self.option_frame, text="TODO:\n Insert image display here", font=("Arial", 14, "bold"))
-        self.temp_label.pack(pady=10) 
+        # Image display label (replace TODO)
+        self.image_label = CTkLabel(self.option_frame, text="No image yet", font=("Arial", 14, "bold"))
+        self.image_label.pack(pady=10)
 
         # Shortcut Keys
         self.input_field.bind("<Return>", lambda e: self.submit_query())
@@ -125,7 +125,7 @@ class App(CTk):
 
         for i, row in df.iterrows():
             print()
-            image_path = os.path.join("../clipse/photos/images/", os.path.basename(row['image']))
+            image_path = os.path.join("../clipse/photos/tenk/", os.path.basename(row['image']))
             if image_path and os.path.exists(image_path):
                 filename = os.path.basename(image_path)
                 dest_path = os.path.join(temp_dir, filename)
@@ -164,7 +164,7 @@ class App(CTk):
         # Step 2: Ensure searcher is available
         if not hasattr(self, "searcher"):
             from clip_searcher import ClipSearcher
-            self.searcher = ClipSearcher("../clipse/index/images.json")
+            self.searcher = ClipSearcher("../clipse/index/image.json")
 
         # Step 3: For each query from the LLM, run a CLIP search
         for q in self.queries:
@@ -175,7 +175,7 @@ class App(CTk):
                     command = ["uv", "run", "build_index.py", "temp"]
                     subprocess.run(command)
                 run_build_index()
-                self.clear_temp_folder()
+                #self.clear_temp_folder() comment out for testing TODO clean
                 self.searcher = ClipSearcher("./index/temp.json")
         print("All queries processed and results displayed.")
         # Step 4: Display results in the output textbox
@@ -183,12 +183,27 @@ class App(CTk):
         self._display_clip_results(query, df)
 
     def _display_clip_results(self, query, df):
+        self.last_df = df  # Save for image display
         self.out_textbox.configure(state="normal")
         self.out_textbox.delete("1.0", "end")
         self.out_textbox.insert("end",
             f"Top matches for “{query}”\n\n{df.to_string(index=False)}\n")
         self.out_textbox.configure(state="disabled")
+        self._display_first_image_from_temp()
 
+    def _display_first_image_from_temp(self):
+        temp_dir = os.path.join(os.path.dirname(__file__), "temp")
+        # Get the top image from the last DataFrame used
+        if hasattr(self, "last_df") and not self.last_df.empty:
+            top_image = self.last_df.iloc[0]["image"]
+            img_path = os.path.join(temp_dir, os.path.basename(top_image))
+            if os.path.exists(img_path):
+                img = Image.open(img_path)
+                img.thumbnail((200, 200))
+                self.tk_img = ImageTk.PhotoImage(img)
+                self.image_label.configure(image=self.tk_img, text="")
+                self.clear_temp_folder()
+                return
             
     def submit_query(self):
         self.out_textbox.configure(state="normal")
