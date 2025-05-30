@@ -2,6 +2,7 @@ from tkinter import *
 from customtkinter import *
 import ollama
 import sys
+from clip_searcher import ClipSearcher
 from threading import Thread
 
 
@@ -9,9 +10,11 @@ class App(CTk):
     def __init__(self):
         super().__init__()
         self.model = "No model selected"
-        self.options = ["No model selected", "llama3.2-vision",  "modded_llama3.2"]
+        self.options = ["No model selected", "test_llm", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
         self.client = ollama.Client()
         self.chat_history = []
+        self.queries = []
+        self.dataset = None
         self.initUI()
 
     def initUI(self):
@@ -106,24 +109,76 @@ class App(CTk):
                 self.update_idletasks()
             # Append assistant response to history
             self.chat_history.append({"role": "assistant", "content": response})
+            self.queries = [line.strip() for line in response.strip().splitlines() if line.strip()]
+            print("Queries:", self.queries)
         except Exception as e:
             self.out_textbox.insert("end", f"\nError: {e}\n")
         finally:
             self.out_textbox.configure(state="disabled")
 
+    def _process_multihop_query(self, query):
+        # Step 1: Generate sub-queries from LLM
+        self.stream_model_response(query)
+
+        # Step 2: Ensure searcher is available
+        if not hasattr(self, "searcher"):
+            from clip_searcher import ClipSearcher
+            self.searcher = ClipSearcher("../clipse/index/images.json")
+
+        # Step 3: For each query from the LLM, run a CLIP search
+        for q in self.queries:
+            if q:
+                df = self.searcher.query(q, top_k=5)
+                print(f"Query: {q}\nResults:\n{df}\n")
+                self.after(0, lambda q=q, df=df: self._display_clip_results(q, df))
+
+    def submit_image_query(self):
+        query = self.image_query_field.get().strip()
+        if not query:
+            return
+        # run search in background so the GUI stays responsive
+        Thread(target=self._run_clip_query,
+               args=(query,), daemon=True).start()
+
+    def _run_clip_query(self, query):
+        df = self.searcher.query(query, top_k=10)
+
+        # Safely update Tk widgets from the main thread
+        self.after(0, lambda: self._display_clip_results(query, df))
+
+    def _display_clip_results(self, query, df):
+        self.out_textbox.configure(state="normal")
+        self.out_textbox.delete("1.0", "end")
+        self.out_textbox.insert("end",
+            f"🔎 Top matches for “{query}”\n\n{df.to_string(index=False)}\n")
+        self.out_textbox.configure(state="disabled")
+
             
     def submit_query(self):
         self.out_textbox.configure(state="normal")
         query = self.input_field.get("0.0", "end").strip()
-        #self.input_field.delete("0.0", "end")
         self.out_textbox.delete("0.0", "end")
+
+        if not query:
+            self.out_textbox.insert("0.0", "Please enter a query.")
+            self.out_textbox.configure(state="disabled")
+            return
+
+        """
+        image_query = query[8:].strip()
+        if not hasattr(self, "searcher"):
+            from clip_searcher import ClipSearcher
+            self.searcher = ClipSearcher("../clipse/index/images.json")
+        Thread(target=self._run_clip_query, args=(image_query,), daemon=True).start()"""
 
         if self.model == "No model selected":
             self.out_textbox.insert("0.0", "Please select a model.")
             self.out_textbox.configure(state="disabled")
             return
 
-        Thread(target=self.stream_model_response, args=(query,), daemon=True).start()
+        Thread(target=self._process_multihop_query, args=(query,), daemon=True).start()
+
+
 
     def add_model(self):
         dialog = CTkInputDialog(text="Type in the name of the model.\n (You need to have a local version of your LLM):", title="Add a model")
