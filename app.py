@@ -1,6 +1,9 @@
 from tkinter import *
 from customtkinter import *
 import ollama
+import os
+import shutil
+import subprocess
 import sys
 from clip_searcher import ClipSearcher
 from threading import Thread
@@ -9,7 +12,7 @@ from threading import Thread
 class App(CTk):
     def __init__(self):
         super().__init__()
-        self.model = "No model selected"
+        self.model = "modded_llama3.2"
         self.options = ["No model selected", "test_llm", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
         self.client = ollama.Client()
         self.chat_history = []
@@ -116,6 +119,32 @@ class App(CTk):
         finally:
             self.out_textbox.configure(state="disabled")
 
+    def _save_images_from_df(self, df):
+        temp_dir = os.path.join(os.path.dirname(__file__), "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+
+        for i, row in df.iterrows():
+            print()
+            image_path = os.path.join("../clipse/photos/images/", os.path.basename(row['image']))
+            if image_path and os.path.exists(image_path):
+                filename = os.path.basename(image_path)
+                dest_path = os.path.join(temp_dir, filename)
+                shutil.copy(image_path, dest_path)
+
+    def clear_temp_folder(self):
+        temp_dir = os.path.join(os.path.dirname(__file__), "temp")
+        if os.path.exists(temp_dir):
+            for filename in os.listdir(temp_dir):
+                file_path = os.path.join(temp_dir, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)  # remove file or link
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)  # remove folder recursively
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+
+
     def _process_multihop_query(self, query):
         # Step 1: Generate sub-queries from LLM
         self.stream_model_response(query)
@@ -128,23 +157,17 @@ class App(CTk):
         # Step 3: For each query from the LLM, run a CLIP search
         for q in self.queries:
             if q:
-                df = self.searcher.query(q, top_k=5)
-                print(f"Query: {q}\nResults:\n{df}\n")
-                self.after(0, lambda q=q, df=df: self._display_clip_results(q, df))
-
-    def submit_image_query(self):
-        query = self.image_query_field.get().strip()
-        if not query:
-            return
-        # run search in background so the GUI stays responsive
-        Thread(target=self._run_clip_query,
-               args=(query,), daemon=True).start()
-
-    def _run_clip_query(self, query):
-        df = self.searcher.query(query, top_k=10)
-
-        # Safely update Tk widgets from the main thread
-        self.after(0, lambda: self._display_clip_results(query, df))
+                df = self.searcher.query(q, top_k=50)
+                self._save_images_from_df(df)
+                def run_build_index():
+                    command = ["uv", "run", "build_index.py", "temp"]
+                    subprocess.run(command)
+                run_build_index()
+                self.clear_temp_folder()
+                self.searcher = ClipSearcher("./index/temp.json")
+        print("All queries processed and results displayed.")
+        # Step 4: Display results in the output textbox
+        self._display_clip_results(query, df)
 
     def _display_clip_results(self, query, df):
         self.out_textbox.configure(state="normal")
@@ -163,13 +186,6 @@ class App(CTk):
             self.out_textbox.insert("0.0", "Please enter a query.")
             self.out_textbox.configure(state="disabled")
             return
-
-        """
-        image_query = query[8:].strip()
-        if not hasattr(self, "searcher"):
-            from clip_searcher import ClipSearcher
-            self.searcher = ClipSearcher("../clipse/index/images.json")
-        Thread(target=self._run_clip_query, args=(image_query,), daemon=True).start()"""
 
         if self.model == "No model selected":
             self.out_textbox.insert("0.0", "Please select a model.")
