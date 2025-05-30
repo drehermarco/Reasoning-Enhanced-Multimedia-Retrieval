@@ -144,6 +144,18 @@ class App(CTk):
                 except Exception as e:
                     print(f"Failed to delete {file_path}. Reason: {e}")
 
+    def clear_index_folder(self):
+        temp_dir = os.path.join(os.path.dirname(__file__), "index")
+        if os.path.exists(temp_dir):
+            for filename in os.listdir(temp_dir):
+                file_path = os.path.join(temp_dir, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)  # remove file or link
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)  # remove folder recursively
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
 
     def _process_multihop_query(self, query):
         # Step 1: Generate sub-queries from LLM
@@ -167,13 +179,14 @@ class App(CTk):
                 self.searcher = ClipSearcher("./index/temp.json")
         print("All queries processed and results displayed.")
         # Step 4: Display results in the output textbox
+        self.clear_index_folder()
         self._display_clip_results(query, df)
 
     def _display_clip_results(self, query, df):
         self.out_textbox.configure(state="normal")
         self.out_textbox.delete("1.0", "end")
         self.out_textbox.insert("end",
-            f"🔎 Top matches for “{query}”\n\n{df.to_string(index=False)}\n")
+            f"Top matches for “{query}”\n\n{df.to_string(index=False)}\n")
         self.out_textbox.configure(state="disabled")
 
             
