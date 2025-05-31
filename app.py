@@ -4,7 +4,7 @@ import ollama
 import os
 import shutil
 import subprocess
-import sys
+import re
 from clip_searcher import ClipSearcher
 from threading import Thread
 from PIL import Image, ImageTk
@@ -12,7 +12,7 @@ from PIL import Image, ImageTk
 class App(CTk):
     def __init__(self):
         super().__init__()
-        self.model = "llama3.2-vision"
+        self.model = "No model selected"
         self.options = ["No model selected", "llama3.2-vision", "test_llm", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
         self.client = ollama.Client()
         self.chat_history = []
@@ -112,7 +112,12 @@ class App(CTk):
                 self.update_idletasks()
             # Append assistant response to history
             self.chat_history.append({"role": "assistant", "content": response})
-            self.queries = [line.strip() for line in response.strip().splitlines() if line.strip()]
+            # Only keep lines that look like numbered sub-queries, and strip the numbering
+            self.queries = [
+                re.sub(r"^\d+\.\s*", "", line.strip())
+                for line in response.strip().splitlines()
+                if re.match(r"^\d+\.\s*", line.strip())
+            ]
             print("Queries:", self.queries)
         except Exception as e:
             self.out_textbox.insert("end", f"\nError: {e}\n")
@@ -207,8 +212,6 @@ class App(CTk):
             return
 
         Thread(target=self._process_multihop_query, args=(query,), daemon=True).start()
-
-
 
     def add_model(self):
         dialog = CTkInputDialog(text="Type in the name of the model.\n (You need to have a local version of your LLM):", title="Add a model")
