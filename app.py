@@ -124,28 +124,14 @@ class App(CTk):
         os.makedirs(temp_dir, exist_ok=True)
 
         for i, row in df.iterrows():
-            print()
-            image_path = os.path.join("../clipse/photos/tenk/", os.path.basename(row['image']))
+            image_path = os.path.join("../clipse/photos/images/", os.path.basename(row['image']))
             if image_path and os.path.exists(image_path):
                 filename = os.path.basename(image_path)
                 dest_path = os.path.join(temp_dir, filename)
                 shutil.copy(image_path, dest_path)
 
-    def clear_temp_folder(self):
-        temp_dir = os.path.join(os.path.dirname(__file__), "temp")
-        if os.path.exists(temp_dir):
-            for filename in os.listdir(temp_dir):
-                file_path = os.path.join(temp_dir, filename)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)  # remove file or link
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)  # remove folder recursively
-                except Exception as e:
-                    print(f"Failed to delete {file_path}. Reason: {e}")
-
-    def clear_index_folder(self):
-        temp_dir = os.path.join(os.path.dirname(__file__), "index")
+    def clear_temp_folder(self, name):
+        temp_dir = os.path.join(os.path.dirname(__file__), name)
         if os.path.exists(temp_dir):
             for filename in os.listdir(temp_dir):
                 file_path = os.path.join(temp_dir, filename)
@@ -164,7 +150,7 @@ class App(CTk):
         # Step 2: Ensure searcher is available
         if not hasattr(self, "searcher"):
             from clip_searcher import ClipSearcher
-            self.searcher = ClipSearcher("../clipse/index/image.json")
+            self.searcher = ClipSearcher("../clipse/index/images.json")
 
         # Step 3: For each query from the LLM, run a CLIP search
         for q in self.queries:
@@ -179,7 +165,7 @@ class App(CTk):
                 self.searcher = ClipSearcher("./index/temp.json")
         print("All queries processed and results displayed.")
         # Step 4: Display results in the output textbox
-        self.clear_index_folder()
+        self.clear_temp_folder("index")
         self._display_clip_results(query, df)
 
     def _display_clip_results(self, query, df):
@@ -200,9 +186,9 @@ class App(CTk):
             if os.path.exists(img_path):
                 img = Image.open(img_path)
                 img.thumbnail((200, 200))
-                self.tk_img = ImageTk.PhotoImage(img)
-                self.image_label.configure(image=self.tk_img, text="")
-                self.clear_temp_folder()
+                self.ctk_img = CTkImage(light_image=img, dark_image=img, size=img.size)
+                self.image_label.configure(image=self.ctk_img, text="")
+                self.clear_temp_folder("temp")
                 return
             
     def submit_query(self):
