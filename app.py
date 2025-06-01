@@ -165,12 +165,13 @@ class App(CTk):
                     print(f"Failed to delete {file_path}. Reason: {e}")
 
     def _process_multihop_query(self, query):
+        # Step 0: Clear previous results
+        self.clear_temp_folder("temp")
         # Step 1: Generate sub-queries from LLM
         self.stream_model_response(query)
 
         # Step 2: Ensure searcher is available
-        if not hasattr(self, "searcher"):
-            from clip_searcher import ClipSearcher
+        if not hasattr(self, "searcher") or self.searcher is None:
             self.searcher = ClipSearcher("../clipse/index/images.json")
 
         # Step 3: Collect images from each sub-query
@@ -205,6 +206,8 @@ class App(CTk):
 
         # Cleanup old results
         self.clear_temp_folder("index")
+
+        self.searcher = None
 
         # Step 8: Show results
         self._display_clip_results(query, final_df)
