@@ -1,8 +1,7 @@
-# clip_search.py  (NEW small helper module)
 import os, json, numpy as np
 import pandas as pd
 from tqdm import tqdm
-from clip_utils import CLIP     # ← whatever wrapper you already have
+from clip_utils import CLIP
 
 def _transform_json_index(index_json):
     images, embeddings = [], []
@@ -45,7 +44,6 @@ class ClipSearcher:
             f"A {text} image"
         ]
 
-        # Convert Torch tensors to NumPy arrays
         queries = [self.clip.get_text_embedding(t).detach().cpu().numpy() for t in prompt_templates]
         q = np.mean(queries, axis=0)
         q /= np.linalg.norm(q)
