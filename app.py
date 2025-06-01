@@ -4,6 +4,7 @@ import ollama
 import os
 import shutil
 import subprocess
+import pandas as pd
 import re
 from clip_searcher import ClipSearcher
 from threading import Thread
@@ -19,6 +20,18 @@ class App(CTk):
         self.queries = []
         self.dataset = None
         self.initUI()
+
+    def on_app_close(self):
+        try:
+            print("Cleaning up before exit...")
+            if hasattr(self, "client"):
+                self.client.close()  # If supported by ollama.Client
+                print("Closed Ollama client.")
+        except Exception as e:
+            print(f"Error closing Ollama client: {e}")
+        finally:
+            self.destroy()
+
 
     def initUI(self):
         self.title("Reasoning Enhanced Multimedia Retrieval")
@@ -92,14 +105,17 @@ class App(CTk):
         self.divider = CTkFrame(self.option_frame, height=2, fg_color="#D3D3D3")
         self.divider.pack(fill="x", pady=(10, 5))
 
-        # Image display label (replace TODO)
-        self.image_label = CTkLabel(self.option_frame, text="No image yet", font=("Arial", 14, "bold"))
-        self.image_label.pack(pady=10)
+        self.model_add_label = CTkLabel(self.option_frame, text="Click here to see Top 9 results:", font=("Arial", 14, "bold"))
+        self.model_add_label.pack(pady=10)
+
+        self.view_gallery_btn = CTkButton(self.option_frame, text="View Gallery (Top 9)",
+                                  command=self._open_gallery_window)
+        self.view_gallery_btn.pack(pady=10)
 
         # Shortcut Keys
         self.input_field.bind("<Return>", lambda e: self.submit_query())
+        self.protocol("WM_DELETE_WINDOW", self.on_app_close)
 
-    
     def stream_model_response(self, query):
         self.chat_history.append({"role": "user", "content": query})
         try:
@@ -157,21 +173,41 @@ class App(CTk):
             from clip_searcher import ClipSearcher
             self.searcher = ClipSearcher("../clipse/index/images.json")
 
-        # Step 3: For each query from the LLM, run a CLIP search
+        # Step 3: Collect images from each sub-query
+        all_dfs = []
         for q in self.queries:
             if q:
-                df = self.searcher.query(q, top_k=50)
-                self._save_images_from_df(df)
-                def run_build_index():
-                    command = ["uv", "run", "build_index.py", "temp"]
-                    subprocess.run(command)
-                run_build_index()
-                #self.clear_temp_folder() comment out for testing TODO clean
-                self.searcher = ClipSearcher("./index/temp.json")
-        print("All queries processed and results displayed.")
-        # Step 4: Display results in the output textbox
+                df = self.searcher.query(q, top_k=100)
+                all_dfs.append(df)
+
+        if not all_dfs:
+            self.out_textbox.insert("end", "\nNo sub-query results.\n")
+            return
+
+        # Combine all image rows (deduplicated by image path)
+        combined_df = pd.concat(all_dfs).drop_duplicates(subset="image").reset_index(drop=True)
+
+        # Step 4: Save all top images from combined results
+        self._save_images_from_df(combined_df)
+
+        # Step 5: Build index once over temp folder
+        def run_build_index():
+            command = ["uv", "run", "build_index.py", "temp"]
+            subprocess.run(command)
+
+        run_build_index()
+
+        # Step 6: Load new index once
+        self.searcher = ClipSearcher("./index/temp.json")
+
+        # Step 7: Final retrieval from updated index
+        final_df = self.searcher.query(query, top_k=25)
+
+        # Cleanup old results
         self.clear_temp_folder("index")
-        self._display_clip_results(query, df)
+
+        # Step 8: Show results
+        self._display_clip_results(query, final_df)
 
     def _display_clip_results(self, query, df):
         self.last_df = df  # Save for image display
@@ -180,21 +216,34 @@ class App(CTk):
         self.out_textbox.insert("end",
             f"Top matches for “{query}”\n\n{df.to_string(index=False)}\n")
         self.out_textbox.configure(state="disabled")
-        self._display_first_image_from_temp()
+        #self._display_first_image_from_temp()
 
-    def _display_first_image_from_temp(self):
+    def _open_gallery_window(self):
+        if not hasattr(self, "last_df") or self.last_df.empty:
+            return
+
+        top_df = self.last_df.head(9)
         temp_dir = os.path.join(os.path.dirname(__file__), "temp")
-        # Get the top image from the last DataFrame used
-        if hasattr(self, "last_df") and not self.last_df.empty:
-            top_image = self.last_df.iloc[0]["image"]
-            img_path = os.path.join(temp_dir, os.path.basename(top_image))
+
+        # Create the new Toplevel window
+        win = CTkToplevel(self)
+        win.title("Gallery View")
+        win.geometry("600x600")
+
+        # Use a grid of 3x3 thumbnails
+        for i, (_, row) in enumerate(top_df.iterrows()):
+            img_path = os.path.join(temp_dir, os.path.basename(row["image"]))
             if os.path.exists(img_path):
-                img = Image.open(img_path)
-                img.thumbnail((200, 200))
-                self.ctk_img = CTkImage(light_image=img, dark_image=img, size=img.size)
-                self.image_label.configure(image=self.ctk_img, text="")
-                self.clear_temp_folder("temp")
-                return
+                try:
+                    img = Image.open(img_path)
+                    img.thumbnail((180, 180))
+                    tk_img = CTkImage(light_image=img, dark_image=img, size=img.size)
+
+                    label = CTkLabel(win, image=tk_img, text="")
+                    label.image = tk_img  # prevent garbage collection
+                    label.grid(row=i // 3, column=i % 3, padx=10, pady=10)
+                except Exception as e:
+                    print(f"Failed to load {img_path}: {e}")
             
     def submit_query(self):
         self.out_textbox.configure(state="normal")
