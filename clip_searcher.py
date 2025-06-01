@@ -35,13 +35,30 @@ class ClipSearcher:
         self.images, self.embeddings = load_index(index_file)
         self.clip = CLIP()
 
-    def query(self, text, top_k=10):
+    def query(self, text, top_k=50, similarity_threshold=None, prompt_templates=None):
         if not text:
             return pd.DataFrame(columns=["image", "similarity"])
-        q = self.clip.get_text_embedding(text)
+
+        prompt_templates = prompt_templates or [
+            f"A photo of {text}",
+            f"A close-up of {text}",
+            f"A {text} image"
+        ]
+
+        # Convert Torch tensors to NumPy arrays
+        queries = [self.clip.get_text_embedding(t).detach().cpu().numpy() for t in prompt_templates]
+        q = np.mean(queries, axis=0)
+        q /= np.linalg.norm(q)
+
         sims = self.clip.calc_image_embeddings_text_embedding_similarity(self.embeddings, q)
-        return (
-            pd.DataFrame({"image": self.images, "similarity": sims})
-              .sort_values("similarity", ascending=False)
-              .head(top_k)
-        )
+        df = pd.DataFrame({"image": self.images, "similarity": sims})
+
+        if similarity_threshold is not None:
+            df = df[df["similarity"] >= similarity_threshold]
+
+        df = df.sort_values("similarity", ascending=False)
+
+        if top_k is not None:
+            df = df.head(top_k)
+
+        return df

@@ -14,7 +14,7 @@ class App(CTk):
     def __init__(self):
         super().__init__()
         self.model = "No model selected"
-        self.options = ["No model selected", "llama3.2-vision", "test_llm", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
+        self.options = ["No model selected", "modded_deepseek", "modded_mistral", "modded_llama3.2"]
         self.client = ollama.Client()
         self.chat_history = []
         self.queries = []
@@ -25,7 +25,9 @@ class App(CTk):
         try:
             print("Cleaning up before exit...")
             if hasattr(self, "client"):
-                self.client.close()  # If supported by ollama.Client
+                subprocess.run(["ollama", "stop", self.model], check=True)
+                self.clear_temp_folder("temp")
+                self.clear_temp_folder("index")
                 print("Closed Ollama client.")
         except Exception as e:
             print(f"Error closing Ollama client: {e}")
@@ -178,7 +180,7 @@ class App(CTk):
         all_dfs = []
         for q in self.queries:
             if q:
-                df = self.searcher.query(q, top_k=100)
+                df = self.searcher.query(q, top_k=200, similarity_threshold=25.0)
                 all_dfs.append(df)
 
         if not all_dfs:
@@ -215,11 +217,9 @@ class App(CTk):
     def _display_clip_results(self, query, df):
         self.last_df = df  # Save for image display
         self.out_textbox.configure(state="normal")
-        self.out_textbox.delete("1.0", "end")
         self.out_textbox.insert("end",
-            f"Top matches for “{query}”\n\n{df.to_string(index=False)}\n")
+            f"\nTop matches for “{query}”\n\n{df.to_string(index=False)}\n")
         self.out_textbox.configure(state="disabled")
-        #self._display_first_image_from_temp()
 
     def _open_gallery_window(self):
         if not hasattr(self, "last_df") or self.last_df.empty:
