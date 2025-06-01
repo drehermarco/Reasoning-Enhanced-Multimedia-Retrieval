@@ -64,4 +64,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Acknowledgments
 
-Thanks to the creators of CLIPSE and open-source contributors whose tools this project builds upon.
+Thanks to the creators of Ollama, CLIPSE and open-source contributors whose tools this project builds upon.
