@@ -3,6 +3,7 @@
 ## Requirements
 - Python 3.11+
 - Images for the search engine
+- Ollama for the models
 
 ## Setup
 
@@ -31,6 +32,13 @@
    ├── clipse/
    └── Reasoning-Enhanced-Multimedia-Retrieval/
    ```
+5. **Install Ollama**
+    Follow the guide on the [ollama repository](https://github.com/ollama/ollama) to set up the LLM's.
+
+    After the ollama setup you can apply the modelfile to your downloaded models via:
+    ```bash
+    ollama create remr -f Modelfile   # remr = Reasoning‑Enhanced Multimedia Retrieval
+    ```
 
 ## Usage
 
@@ -40,7 +48,7 @@
    ```
 
 2. **Interact with the Interface**
-   Input queries and explore the multimedia retrieval capabilities enhanced by reasoning logic.
+   Input queries and explore the multimedia retrieval capabilities enhanced by reasoning logic. To add the model input the name of the model in the "add model" window.
 
 ## Project Structure
 
