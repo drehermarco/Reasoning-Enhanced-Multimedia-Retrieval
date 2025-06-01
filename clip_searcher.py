@@ -1,7 +1,7 @@
 import os, json, numpy as np
 import pandas as pd
 from tqdm import tqdm
-from clip_utils import CLIP
+from clipse.clip_utils import CLIP
 
 def _transform_json_index(index_json):
     images, embeddings = [], []

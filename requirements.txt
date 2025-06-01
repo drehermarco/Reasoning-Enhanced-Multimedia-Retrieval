@@ -1,0 +1,7 @@
+open_clip_torch
+flask
+pandas
+rich
+tqdm
+customtkinter
+ollama

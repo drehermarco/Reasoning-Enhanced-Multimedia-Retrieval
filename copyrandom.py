@@ -57,8 +57,8 @@ def copy_random_pictures(source_folder, dest_folder, num_pictures_to_copy):
 
 if __name__ == "__main__":
     # --- Configuration ---
-    source_directory = "C:/Users/karlz/IdeaProjects/sandbox/media"
-    destination_directory = "C:/Users/karlz/GitProjects/randomimage"
+    source_directory = "C:/university/FS25/CTDS/sandbox_big/media"
+    destination_directory = "C:/university/FS25/CTDS/clipse/full/images"
     number_of_pictures = 5000
     # --- End Configuration ---
     copy_random_pictures(source_directory, destination_directory, number_of_pictures)

@@ -195,7 +195,7 @@ class App(CTk):
 
         # Step 5: Build index once over temp folder
         def run_build_index():
-            command = ["uv", "run", "build_index.py", "temp"]
+            command = ["uv", "run", "clipse/build_index.py", "temp"]
             subprocess.run(command)
 
         run_build_index()
@@ -218,7 +218,7 @@ class App(CTk):
         self.last_df = df  # Save for image display
         self.out_textbox.configure(state="normal")
         self.out_textbox.insert("end",
-            f"\nTop matches for “{query}”\n\n{df.to_string(index=False)}\n")
+            f"\n\nTop matches for “{query}”\n\n{df.to_string(index=False)}\n")
         self.out_textbox.configure(state="disabled")
 
     def _open_gallery_window(self):
